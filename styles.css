@@ -217,3 +217,8 @@ main>.welcome .badge{display:inline-block;max-width:100%;min-width:260px;padding
 .feedback-invite{font-size:20px;color:var(--muted);margin:0 0 8px}
 @media(prefers-reduced-motion:reduce){.feedback-dialog::backdrop{backdrop-filter:none}}
 @media(max-width:480px){.feedback-body{padding:20px}.star-btn{width:52px;height:52px;font-size:28px}.star-rating{gap:6px}}
+
+.clear-order-dialog{border:1px solid var(--border);border-radius:20px;background:#fff;color:var(--ink);padding:32px;width:min(520px,calc(100% - 32px));box-shadow:0 24px 70px #173e3440}
+.clear-order-dialog::backdrop{background:#17251fd0;backdrop-filter:blur(3px)}
+.clear-order-dialog h2{color:var(--green);margin-bottom:10px}
+.clear-order-dialog p{margin-bottom:26px}
