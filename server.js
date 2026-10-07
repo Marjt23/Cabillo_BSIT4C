@@ -2,7 +2,7 @@ const http=require('node:http');
 const fs=require('node:fs');
 const path=require('node:path');
 const database=require('./database');
-const root=__dirname;
+const root=path.join(__dirname,'public');
 const DEFAULT_PORT=4173;
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8'};
 
