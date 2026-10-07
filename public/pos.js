@@ -28,6 +28,7 @@
       if(q) this.cart[id]=q; else delete this.cart[id];
     }
     remove(id) { if(this.step==='order') delete this.cart[id]; }
+    clearOrder() { if(this.step!=='order'||!this.count()) return false; this.cart={}; this.method=null; this.cash=''; this.error=''; return true; }
     navigate(step) {
       const allowed={order:['review'],review:['order','payment'],payment:['review','order'],success:['receipt']};
       if(this.processing || !allowed[this.step]?.includes(step) || (step!=='order'&&!this.total())) return false;
