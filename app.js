@@ -1,8 +1,39 @@
-'use strict';
+﻿'use strict';
 const {POS,products,money,parseCash}=BiteBrew;
 const pos=new POS(); let category='All'; let toastTimer;
 const main=document.querySelector('#main');
 let receiptTimer;
+// Feedback is stored in localStorage only — it stays in this browser and is not sent to store staff.
+let feedbackDialogEl=null;
+const FEEDBACK_KEY='bite_brew_feedback';
+function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function loadFeedback(){try{return JSON.parse(localStorage.getItem(FEEDBACK_KEY)||'[]');}catch{return[];}}
+function feedbackAlreadySaved(ref){return loadFeedback().some(f=>f.reference===ref);}
+function saveFeedbackRecord(ref,stars,comment){
+ const records=loadFeedback();
+ if(records.some(f=>f.reference===ref))return;
+ records.push({reference:ref,stars,comment:comment?String(comment).slice(0,500):'',submittedAt:new Date().toISOString()});
+ try{localStorage.setItem(FEEDBACK_KEY,JSON.stringify(records));}
+ catch{throw new Error('Storage unavailable. Please try again.');}
+}
+function openFeedbackDialog(){
+ if(feedbackDialogEl||!pos.receipt)return;
+ const fb=pos.feedbackState;
+ if(fb.submitted||feedbackAlreadySaved(pos.receipt.reference))return;
+ const starBtns=[1,2,3,4,5].map(n=>`<button class="star-btn${fb.stars>=n?' selected':''}" data-action="feedback-star" data-stars="${n}" aria-label="${n} star${n>1?'s':''}" aria-pressed="${fb.stars===n}">★</button>`).join('');
+ main.insertAdjacentHTML('beforeend',`<dialog class="feedback-dialog" aria-labelledby="fb-title" aria-modal="true"><div class="feedback-body"><h2 id="fb-title" tabindex="-1">Rate Your Experience</h2><p class="feedback-sub">How was your visit to Bite &amp; Brew today?</p><div class="star-rating" role="group" aria-label="Rate your experience from 1 to 5 stars">${starBtns}</div><div id="fb-star-err" class="error" role="alert" aria-live="polite"></div><label for="fb-comment">Comment <span class="optional">(optional)</span></label><textarea id="fb-comment" maxlength="500" placeholder="Tell us about your experience…" aria-describedby="fb-char-count fb-save-err">${escapeHtml(fb.comment)}</textarea><div id="fb-char-count" class="char-count" aria-live="polite"><span id="fb-chars">${fb.comment.length}</span>/500</div><div id="fb-save-err" class="error" role="alert" aria-live="polite"></div><div class="feedback-actions">${button('Cancel','feedback-cancel','class="secondary"')}${button('Submit Feedback','feedback-submit','class="primary"')}</div></div></dialog>`);
+ feedbackDialogEl=main.querySelector('.feedback-dialog');
+ feedbackDialogEl.querySelector('#fb-comment').addEventListener('input',e=>{pos.feedbackState.comment=e.target.value;feedbackDialogEl.querySelector('#fb-chars').textContent=e.target.value.length;});
+ feedbackDialogEl.addEventListener('cancel',e=>{e.preventDefault();closeFeedbackDialog();});
+ feedbackDialogEl.showModal();
+ feedbackDialogEl.querySelector('#fb-title').focus();
+}
+function closeFeedbackDialog(){
+ if(!feedbackDialogEl)return;
+ feedbackDialogEl.close();
+ feedbackDialogEl.remove();
+ feedbackDialogEl=null;
+}
 function openReceipt(){clearTimeout(receiptTimer);pos.navigate('receipt');render(true);}
 function showTransactionPopup(){
  const r=pos.receipt;
@@ -57,10 +88,11 @@ function paymentDetails(){
 function cashChange(){const paid=parseCash(pos.cash);return paid!==null&&paid>=pos.total()?money(paid-pos.total()):'—';}
 function details(r){return `<dl><div><dt>Transaction reference</dt><dd class="reference">${r.reference}</dd></div><div><dt>Payment method</dt><dd>${r.method}</dd></div><div><dt>Total</dt><dd>${money(r.total)}</dd></div><div><dt>Amount paid</dt><dd>${money(r.paid)}</dd></div><div><dt>Change</dt><dd>${money(r.change)}</dd></div></dl>`;}
 function success(){const r=pos.receipt;return `<section class="panel success"><div class="check">✓</div><span class="eyebrow">BITE &amp; BREW</span><h1 tabindex="-1">Payment Successful</h1><p>Thank you! Your campus break is on its way.</p>${details(r)}${button('View Receipt →','receipt','class="primary wide"')}</section>`;}
-function receipt(){const r=pos.receipt;return `${heading('Your receipt','Keep this for your records. Start a new transaction when you’re done.')}<div class="receipt-layout"><section class="panel receipt"><div class="receipt-brand"><span class="logo">♨</span><h1 tabindex="-1">Bite &amp; Brew POS</h1><p>Campus Store · Digital Receipt</p></div><p class="reference">${r.reference}</p><p class="receipt-date">${new Date(r.date).toLocaleString('en-PH',{timeZone:'Asia/Manila',dateStyle:'long',timeStyle:'medium'})} (Philippine time)</p>${table(r.items)}<div class="total"><span>TOTAL</span><strong>${money(r.total)}</strong></div>${details(r)}<p class="paid-status">✓ ${r.status}</p><p class="thanks">Thank you for your purchase!<br><small>See you at your next break.</small></p></section><section class="receipt-controls"><h2>All set. Enjoy your break.</h2><p>Your transaction is complete. Starting a new transaction clears your order and payment details.</p>${button('New Transaction →','new','class="primary wide"')}${button('Print Receipt','print','class="secondary wide"')}<small>Printing is optional.</small></section></div>`;}
+function receipt(){const r=pos.receipt;const fb=pos.feedbackState;const fbSection=(fb.submitted||feedbackAlreadySaved(r.reference))?'<p class="feedback-thanks" role="status">&#10003; Thank you for your feedback!</p>':button('Leave Feedback','feedback-open','class="secondary wide"');return `${heading('Your receipt','Keep this for your records. Start a new transaction when you’re done.')}<div class="receipt-layout"><section class="panel receipt"><div class="receipt-brand"><span class="logo">♨</span><h1 tabindex="-1">Bite &amp; Brew POS</h1><p>Campus Store · Digital Receipt</p></div><p class="reference">${r.reference}</p><p class="receipt-date">${new Date(r.date).toLocaleString('en-PH',{timeZone:'Asia/Manila',dateStyle:'long',timeStyle:'medium'})} (Philippine time)</p>${table(r.items)}<div class="total"><span>TOTAL</span><strong>${money(r.total)}</strong></div>${details(r)}<p class="paid-status">✓ ${r.status}</p><p class="thanks">Thank you for your purchase!<br><small>See you at your next break.</small></p></section><section class="receipt-controls"><h2>All set. Enjoy your break.</h2><p>Your transaction is complete. Starting a new transaction clears your order and payment details.</p>${button('New Transaction →','new','class="primary wide"')}${button('Print Receipt','print','class="secondary wide"')}<hr class="controls-divider"><p class="feedback-invite">Enjoyed your visit? Let us know.</p>${fbSection}<small>Printing is optional.</small></section></div>`;}
 function render(focus=false){
  clearTimeout(receiptTimer);
  main.querySelector('dialog')?.close();
+ feedbackDialogEl=null;
  const index={order:0,review:1,payment:2,success:2,receipt:3}[pos.step];
  document.querySelector('#progress').innerHTML=['Order','Review','Payment','Receipt'].map((s,i)=>`<div class="step ${i===index?'active':''} ${i<index?'done':''}" ${i===index?'aria-current="step"':''}><span>${i<index?'✓':i+1}</span><strong>${s}</strong></div>`).join('');
  main.innerHTML=pos.step==='order'?order():pos.step==='review'?`${heading('Review your order','Check your items before paying. Go back to make any changes.')}<section class="panel review">${table(pos.items())}<div class="total"><span>Total · ${pos.count()} items</span><strong>${money(pos.total())}</strong></div><div class="actions">${button('← Back','back-order','class="secondary"')}${button('Continue to Payment →','payment','class="primary"')}</div></section>`:pos.step==='payment'?payment():pos.step==='success'?success():receipt();
@@ -83,5 +115,27 @@ main.addEventListener('click',async e=>{
  else if(a==='pay'){const pending=pos.pay(1200,saveSale);render();if(await pending){notify('Payment successful — receipt saved');render(true);}else{notify(pos.error);render();}}
  else if(a==='new'){pos.reset();category='All';notify('New transaction started — previous order cleared');render(true);}
  else if(a==='print')window.print();
+ else if(a==='feedback-open'){openFeedbackDialog();}
+ else if(a==='feedback-cancel'){closeFeedbackDialog();}
+ else if(a==='feedback-star'){
+  const n=parseInt(b.dataset.stars,10);pos.feedbackState.stars=n;
+  if(feedbackDialogEl){feedbackDialogEl.querySelectorAll('.star-btn').forEach(s=>{const sn=parseInt(s.dataset.stars,10);s.classList.toggle('selected',sn<=n);s.setAttribute('aria-pressed',String(sn===n));});feedbackDialogEl.querySelector('#fb-star-err').textContent='';}
+ }
+ else if(a==='feedback-submit'){
+  const fb=pos.feedbackState;
+  if(!fb.stars){if(feedbackDialogEl)feedbackDialogEl.querySelector('#fb-star-err').textContent='Please select a star rating before submitting.';return;}
+  if(feedbackDialogEl){feedbackDialogEl.querySelector('#fb-star-err').textContent='';feedbackDialogEl.querySelector('#fb-save-err').textContent='';}
+  b.disabled=true;fb.submitting=true;
+  try{
+   saveFeedbackRecord(pos.receipt.reference,fb.stars,fb.comment);
+   fb.submitted=true;fb.submitting=false;
+   closeFeedbackDialog();
+   notify('Feedback saved — thank you!');
+   render();
+  }catch(err){
+   fb.submitting=false;b.disabled=false;
+   if(feedbackDialogEl)feedbackDialogEl.querySelector('#fb-save-err').textContent=err.message||'Could not save feedback. Please try again.';
+  }
+ }
 });
 render();

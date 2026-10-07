@@ -191,4 +191,29 @@ main>.welcome .badge{display:inline-block;max-width:100%;min-width:260px;padding
   .receipt dl .reference{max-width:105mm;font-size:9pt;margin:0}
   .receipt .paid-status{background:transparent;padding:2mm 0;margin:2mm 0;color:#000}
   .receipt .thanks{font-size:11pt;margin:2mm 0 0}
+  .feedback-thanks,.feedback-invite,.controls-divider,.feedback-btn{display:none}
 }
+
+/* ── Customer Feedback Dialog ─────────────────────────────────── */
+.feedback-dialog{border:1px solid var(--border);border-radius:26px;background:white;color:var(--ink);padding:0;width:calc(100% - 32px);max-width:560px;max-height:calc(100dvh - 32px);overflow-y:auto;box-shadow:0 24px 70px #173e3440}
+.feedback-dialog::backdrop{background:#17251fd0;backdrop-filter:blur(3px)}
+.feedback-body{padding:36px}
+.feedback-body h2{color:var(--green);font-size:28px;margin-bottom:6px}
+.feedback-sub{font-size:20px;color:var(--muted);margin-bottom:24px}
+.star-rating{display:flex;gap:8px;justify-content:center;margin:0 0 6px}
+.star-btn{border:2px solid var(--border);border-radius:50%;background:white;color:#c8c2b4;font-size:36px;line-height:1;width:64px;height:64px;padding:0;display:grid;place-items:center;transition:border-color .12s,background .12s,color .12s}
+.star-btn:hover,.star-btn:focus-visible{border-color:var(--orange);background:#fdf3ed;color:var(--orange)}
+.star-btn.selected{border-color:var(--orange);background:#fdf3ed;color:var(--orange)}
+.star-btn[aria-pressed="true"]{background:var(--orange);border-color:var(--orange);color:white}
+.feedback-body label[for="fb-comment"]{display:block;font-weight:600;font-size:20px;margin:16px 0 8px}
+.optional{font-size:17px;color:var(--muted);font-weight:400}
+#fb-comment{width:100%;min-height:90px;resize:vertical;border:1px solid var(--border);border-radius:12px;padding:14px;font:inherit;font-size:20px;color:var(--ink);background:#faf9f5;line-height:1.5}
+#fb-comment:focus-visible{outline:3px solid #dd8a30;outline-offset:3px}
+.char-count{font-size:17px;color:var(--muted);text-align:right;margin:4px 0 12px}
+.feedback-actions{display:flex;gap:12px;margin-top:20px;flex-wrap:wrap}
+.feedback-actions button{flex:1;min-width:120px}
+.feedback-thanks{background:#edf2e4;color:var(--green);border-radius:12px;padding:14px 18px;font-size:20px;font-weight:600;text-align:center;margin:12px 0 0;border:0}
+.controls-divider{border:0;border-top:1px solid var(--border);margin:20px 0 6px}
+.feedback-invite{font-size:20px;color:var(--muted);margin:0 0 8px}
+@media(prefers-reduced-motion:reduce){.feedback-dialog::backdrop{backdrop-filter:none}}
+@media(max-width:480px){.feedback-body{padding:20px}.star-btn{width:52px;height:52px;font-size:28px}.star-rating{gap:6px}}

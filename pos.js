@@ -18,7 +18,7 @@
   }
   class POS {
     constructor() { this.reset(); }
-    reset() { this.cart={}; this.step='order'; this.method=null; this.cash=''; this.receipt=null; this.processing=false; this.error=''; this.pendingReference=null; }
+    reset() { this.cart={}; this.step='order'; this.method=null; this.cash=''; this.receipt=null; this.processing=false; this.error=''; this.pendingReference=null; this.feedbackState={stars:0,comment:'',submitted:false,submitting:false}; }
     items() { return products.filter(p=>this.cart[p.id]).map(p=>({...p, quantity:this.cart[p.id], subtotal:p.price*this.cart[p.id]})); }
     total() { return this.items().reduce((s,p)=>s+p.subtotal,0); }
     count() { return this.items().reduce((s,p)=>s+p.quantity,0); }
