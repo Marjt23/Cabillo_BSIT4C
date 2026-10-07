@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "routes": [
+    { "src": "/api/sales", "dest": "/api/sales.js" },
+    { "src": "/(.*\\.(js|css|html))", "dest": "/$1" },
+    { "src": "/", "dest": "/index.html" }
+  ]
+}
