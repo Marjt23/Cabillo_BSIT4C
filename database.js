@@ -1,5 +1,5 @@
 'use strict';
-require('dotenv').config();
+try { require('dotenv').config(); } catch {}
 const {createClient} = require('@supabase/supabase-js');
 const {products} = require('./pos');
 
@@ -41,6 +41,19 @@ function validate(input) {
   if (status !== 'Payment Successful') throw new Error('Invalid status.');
 }
 
+function toReceipt(row) {
+  return {
+    reference: row.reference,
+    date: row.date,
+    items: row.items,
+    total: row.total,
+    paid: row.paid,
+    change: row.change,
+    method: row.method,
+    status: row.status,
+  };
+}
+
 async function saveSale(input) {
   validate(input);
   const db = getClient();
@@ -55,24 +68,25 @@ async function saveSale(input) {
     status: input.status,
   };
 
-  const {data, error} = await db
+  const {data: inserted, error: insertError} = await db
     .from('bite_brew_sales')
-    .upsert(row, {onConflict: 'reference', ignoreDuplicates: true})
+    .insert(row)
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (!insertError) return toReceipt(inserted);
 
-  return {
-    reference: data.reference,
-    date: data.date,
-    items: data.items,
-    total: data.total,
-    paid: data.paid,
-    change: data.change,
-    method: data.method,
-    status: data.status,
-  };
+  if (insertError.code === '23505') {
+    const {data: existing, error: fetchError} = await db
+      .from('bite_brew_sales')
+      .select()
+      .eq('reference', input.reference)
+      .single();
+    if (fetchError) throw new Error(fetchError.message);
+    return toReceipt(existing);
+  }
+
+  throw new Error(insertError.message);
 }
 
 module.exports = {initialize, saveSale};
