@@ -8,9 +8,8 @@ let supabase;
 
 function getClient() {
   if (!supabase) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-    if (!url || !key) throw new Error('Missing Supabase credentials in .env');
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://orszqpelenutpecokbad.supabase.co';
+    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_0tSIizn3zrx3LcOYElz_yw_7k2NyFnV';
     supabase = createClient(url, key);
   }
   return supabase;
