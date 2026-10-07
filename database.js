@@ -1,7 +1,7 @@
 'use strict';
 try { require('dotenv').config(); } catch {}
 const {createClient} = require('@supabase/supabase-js');
-const {products} = require('./pos');
+const {products} = require('./public/pos');
 
 const validIds = new Set(products.map(p => p.id));
 let supabase;
