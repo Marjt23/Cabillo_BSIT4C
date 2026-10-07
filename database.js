@@ -1,32 +1,78 @@
-require('dotenv').config({quiet:true});
-const {Pool}=require('pg');
-const {products}=require('./pos');
-const connectionString=process.env.DATABASE_URL?.replace('sslmode=require','sslmode=verify-full');
-const pool=new Pool({connectionString, enableChannelBinding:true, connectionTimeoutMillis:10000, query_timeout:10000});
-pool.on('error',()=>console.error('Database connection interrupted.'));
-async function initialize(){
-  if(!process.env.DATABASE_URL)throw new Error('Set DATABASE_URL in .env before starting.');
-  await pool.query(`CREATE TABLE IF NOT EXISTS bite_brew_sales (
-    reference TEXT PRIMARY KEY,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    receipt JSONB NOT NULL
-  )`);
+'use strict';
+require('dotenv').config();
+const {createClient} = require('@supabase/supabase-js');
+const {products} = require('./pos');
+
+const validIds = new Set(products.map(p => p.id));
+let supabase;
+
+function getClient() {
+  if (!supabase) {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    if (!url || !key) throw new Error('Missing Supabase credentials in .env');
+    supabase = createClient(url, key);
+  }
+  return supabase;
 }
-async function saveSale(input){
-  if(!input||!/^BB-[A-Z0-9-]{10,100}$/.test(input.reference)||!Array.isArray(input.items)||!input.items.length||input.items.length>products.length)throw new Error('Invalid order.');
-  const seen=new Set();
-  const items=input.items.map(item=>{
-    const product=products.find(p=>p.id===item.id);
-    if(!product||seen.has(item.id)||!Number.isInteger(item.quantity)||item.quantity<1||item.quantity>10000)throw new Error('Invalid quantity or product.');
-    seen.add(item.id);
-    return {...product,quantity:item.quantity,subtotal:product.price*item.quantity};
-  });
-  const total=items.reduce((sum,item)=>sum+item.subtotal,0);
-  if(!['Cash','QR Payment','Credit/Debit Card'].includes(input.method))throw new Error('Invalid payment method.');
-  const paid=input.method==='Cash'?input.paid:total;
-  if(!Number.isSafeInteger(paid)||paid<total)throw new Error('Insufficient or invalid payment.');
-  const receipt={reference:input.reference,date:new Date().toISOString(),items,total,paid,change:paid-total,method:input.method,status:'Payment Successful'};
-  const result=await pool.query('INSERT INTO bite_brew_sales (reference,receipt) VALUES ($1,$2) ON CONFLICT (reference) DO UPDATE SET reference=EXCLUDED.reference RETURNING receipt',[receipt.reference,receipt]);
-  return result.rows[0].receipt;
+
+async function initialize() {
+  const {error} = await getClient().from('bite_brew_sales').select('id').limit(1);
+  if (error) throw new Error('Cannot reach bite_brew_sales table: ' + error.message);
 }
-module.exports={initialize,saveSale,pool};
+
+function validate(input) {
+  if (!input || typeof input !== 'object') throw new Error('Invalid sale data.');
+  const {reference, date, items, total, method, status} = input;
+  if (typeof reference !== 'string' || !/^BB-/i.test(reference)) throw new Error('Invalid reference format.');
+  if (typeof date !== 'string' || !Date.parse(date)) throw new Error('Invalid date.');
+  if (!Array.isArray(items) || items.length === 0) throw new Error('Invalid items: order must have at least one item.');
+  for (const item of items) {
+    if (!validIds.has(item.id)) throw new Error(`Invalid product: ${item.id}.`);
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) throw new Error(`Invalid quantity for ${item.id}.`);
+    if (!Number.isInteger(item.price) || item.price < 0) throw new Error(`Invalid price for ${item.id}.`);
+    if (!Number.isInteger(item.subtotal) || item.subtotal !== item.price * item.quantity) throw new Error(`Invalid subtotal for ${item.id}.`);
+  }
+  const expectedTotal = items.reduce((s, p) => s + p.subtotal, 0);
+  if (!Number.isInteger(total) || total !== expectedTotal) throw new Error('Invalid total: does not match items.');
+  if (!Number.isInteger(input.paid) || input.paid < total) throw new Error('Insufficient payment.');
+  if (!Number.isInteger(input.change) || input.change !== input.paid - total) throw new Error('Invalid change amount.');
+  if (!['Cash', 'QR Payment', 'Credit/Debit Card'].includes(method)) throw new Error('Invalid payment method.');
+  if (status !== 'Payment Successful') throw new Error('Invalid status.');
+}
+
+async function saveSale(input) {
+  validate(input);
+  const db = getClient();
+  const row = {
+    reference: input.reference,
+    date: input.date,
+    items: input.items,
+    total: input.total,
+    paid: input.paid,
+    change: input.change,
+    method: input.method,
+    status: input.status,
+  };
+
+  const {data, error} = await db
+    .from('bite_brew_sales')
+    .upsert(row, {onConflict: 'reference', ignoreDuplicates: true})
+    .select()
+    .single();
+
+  if (error) throw new Error(error.message);
+
+  return {
+    reference: data.reference,
+    date: data.date,
+    items: data.items,
+    total: data.total,
+    paid: data.paid,
+    change: data.change,
+    method: data.method,
+    status: data.status,
+  };
+}
+
+module.exports = {initialize, saveSale};
